@@ -71,8 +71,8 @@
         .page-title h2 { font-family: 'Montserrat', sans-serif; font-size: 26px; font-weight: 800; color: var(--text-main); }
         .page-title p { font-size: 13px; color: var(--text-muted); margin-top: 3px; margin-bottom: 20px; }
 
-        /* Filtros */
-        .filters-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 25px; }
+        /* Filtros Grid */
+        .filters-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 25px; }
         .filter-card { background: var(--card-bg); border: 1px solid #dcdfe6; border-radius: var(--border-radius); padding: 8px 12px; }
         .filter-card label { display: block; font-size: 9px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 2px; }
         .filter-card select { width: 100%; border: none; outline: none; background: transparent; font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 13px; color: var(--text-main); cursor: pointer; }
@@ -171,19 +171,28 @@
                     <p id="subtitulo-vista">Consulta agregada por evaluación, nivel, área y ciclo lectivo</p>
                 </div>
 
-                <!-- FILTROS -->
+                <!-- FILTROS grid de 5 campos -->
                 <div class="filters-grid">
                     <div class="filter-card" id="card-filter-colegio">
                         <label for="select-colegio">COLEGIO</label>
-                        <select id="select-colegio" onchange="aplicarFiltros()">
+                        <select id="select-colegio" onchange="actualizarOpcionesCiclos(); aplicarFiltros();">
                             <option value="Alberdi">Alberdi</option>
                             <option value="Esteban Echeverría">Esteban Echeverría</option>
                         </select>
                     </div>
                     <div class="filter-card">
+                        <label for="select-evaluacion">EVALUACIÓN</label>
+                        <select id="select-evaluacion" onchange="aplicarFiltros()">
+                            <option value="Aprender" selected>Aprender</option>
+                            <option value="TESBA">TESBA</option>
+                            <option value="FEPBA">FEPBA</option>
+                        </select>
+                    </div>
+                    <div class="filter-card">
                         <label for="select-nivel">NIVEL</label>
-                        <select id="select-nivel" onchange="aplicarFiltros()">
-                            <option value="Primaria" selected>Primaria (6° Grado)</option>
+                        <select id="select-nivel" onchange="actualizarOpcionesCiclos(); aplicarFiltros();">
+                            <option value="Primaria">Primaria (6° Grado)</option>
+                            <option value="Secundaria">Secundaria</option>
                         </select>
                     </div>
                     <div class="filter-card">
@@ -196,8 +205,7 @@
                     <div class="filter-card">
                         <label for="select-anio">CICLO LECTIVO</label>
                         <select id="select-anio" onchange="aplicarFiltros()">
-                            <option value="2023" selected>2023</option>
-                            <option value="2021">2021</option>
+                            <!-- Se actualiza dinámicamente según la base -->
                         </select>
                     </div>
                 </div>
@@ -225,7 +233,7 @@
                         <div class="sub">nivel destacado</div>
                     </div>
                     <div class="kpi-card blue">
-                        <h4>VAR. VS CICLO 2021</h4>
+                        <h4>VAR. VS CICLO ANTERIOR</h4>
                         <div class="val" id="kpi-variacion">-- pp</div>
                         <div class="sub" id="kpi-variacion-sub">dif. interanual (Sat+Av)</div>
                     </div>
@@ -235,7 +243,7 @@
                 <div class="panels-grid">
                     <div class="panel">
                         <h3>Distribución de Desempeño</h3>
-                        <p class="panel-sub">Resultados del operativo Aprender seleccionado</p>
+                        <p class="panel-sub" id="subtitulo-distribucion">Resultados del operativo seleccionado</p>
 
                         <div class="stacked-bar-container">
                             <div class="bar-seg seg-debajo" id="bar-debajo" style="width: 0%;"></div>
@@ -253,7 +261,7 @@
                     </div>
 
                     <div class="panel">
-                        <h3 id="titulo-grafico">Tendencia entre Ciclos (2021 - 2023)</h3>
+                        <h3 id="titulo-grafico">Tendencia entre Ciclos</h3>
                         <p class="panel-sub" id="subtitulo-grafico">Evolución histórica de niveles alcanzados</p>
 
                         <div style="height: 210px; width: 100%;">
@@ -276,8 +284,8 @@
         };
         const PIN_ACCESO = 'Aprender2027';
 
-        // ENLACE DIRECTO A LA BASE DE DATOS UNIFICADA EN GOOGLE DRIVE
-        const MASTER_SHEET_URL = "https://docs.google.com/spreadsheets/d/1k0uihd-V73Ek9Wm3U7D3x0Xa5UwNz104S5HN8a9Gr3o/gviz/tq?tqx=out:csv";
+        // URL DE LA PLANILLA UNIFICADA
+        const MASTER_SHEET_URL = "https://docs.google.com/spreadsheets/d/1ckI7iJcOt_Omm9OPY3vWZKb0OGd9Ss5H339rGlA2boY/gviz/tq?tqx=out:csv";
 
         let dbRows = [];
         let modoActual = 'resumen';
@@ -336,8 +344,10 @@
                 const res = await fetch(`${MASTER_SHEET_URL}&nocache=${timestamp}`);
                 const text = await res.text();
                 const parsed = parseCSV(text);
-                // Omitir fila de encabezados si existe
+                
+                // Omitir fila 0 si son los encabezados
                 dbRows = parsed.slice(1);
+                actualizarOpcionesCiclos();
                 aplicarFiltros();
             } catch (err) {
                 console.error("Error al sincronizar Google Sheets:", err);
@@ -352,42 +362,111 @@
             document.getElementById('modo-texto').innerText = modo === 'resumen' ? 'Individual' : 'Comparativo';
             
             document.getElementById('titulo-vista').innerText = modo === 'resumen' ? 'Resumen de aprendizajes' : 'Comparativa de Aprendizajes entre Escuelas';
-            document.getElementById('subtitulo-vista').innerText = modo === 'resumen' ? 'Consulta por colegio, nivel, área y ciclo lectivo' : 'Comparación directiva Alberdi vs Esteban Echeverría';
+            document.getElementById('subtitulo-vista').innerText = modo === 'resumen' ? 'Consulta por colegio, evaluación, nivel, área y ciclo lectivo' : 'Comparación directiva Alberdi vs Esteban Echeverría';
             
+            actualizarOpcionesCiclos();
             aplicarFiltros();
         }
 
-        function obtenerValoresFiltro(colegio, nivel, area, anio) {
+        function actualizarOpcionesCiclos() {
+            const colegioSel = document.getElementById('select-colegio').value;
+            const evalSel = document.getElementById('select-evaluacion').value;
+            const nivelSel = document.getElementById('select-nivel').value;
+            const selectAnio = document.getElementById('select-anio');
+
+            // Filtrar ciclos disponibles en la base de datos
+            let aniosSet = new Set();
+            dbRows.forEach(r => {
+                const col = r[0] || '', ev = r[1] || '', niv = r[2] || '', anio = r[4] || '';
+                if (ev.toLowerCase() === evalSel.toLowerCase() && niv.toLowerCase() === nivelSel.toLowerCase()) {
+                    if (modoActual === 'resumen') {
+                        if (col.toLowerCase().includes(colegioSel.toLowerCase())) aniosSet.add(anio);
+                    } else {
+                        aniosSet.add(anio);
+                    }
+                }
+            });
+
+            const aniosArr = Array.from(aniosSet).sort().reverse();
+            selectAnio.innerHTML = '';
+            
+            if (aniosArr.length === 0) {
+                selectAnio.innerHTML = '<option value="">Sin datos</option>';
+            } else {
+                aniosArr.forEach(a => {
+                    const opt = document.createElement('option');
+                    opt.value = a;
+                    opt.innerText = a;
+                    selectAnio.appendChild(opt);
+                });
+            }
+        }
+
+        function obtenerValoresFiltro(colegio, evalNombre, nivel, area, anio) {
             for (let r of dbRows) {
-                // r[0]: Colegio, r[1]: Nivel, r[2]: Área, r[3]: Ciclo Lectivo
+                // r[0]: Colegio, r[1]: Evaluación, r[2]: Nivel, r[3]: Área, r[4]: Ciclo Lectivo
                 if (r[0] && r[0].toLowerCase().includes(colegio.toLowerCase()) &&
-                    r[1] === nivel && r[2] === area && r[3] === anio) {
+                    r[1] && r[1].toLowerCase() === evalNombre.toLowerCase() &&
+                    r[2] && r[2].toLowerCase() === nivel.toLowerCase() &&
+                    r[3] && r[3].toLowerCase() === area.toLowerCase() &&
+                    r[4] === anio) {
                     return {
-                        debajo: parseFloat((r[4] || '0').replace('%', '')),
-                        basico: parseFloat((r[5] || '0').replace('%', '')),
-                        satisfactorio: parseFloat((r[6] || '0').replace('%', '')),
-                        avanzado: parseFloat((r[7] || '0').replace('%', ''))
+                        debajo: parseFloat((r[5] || '0').replace('%', '')),
+                        basico: parseFloat((r[6] || '0').replace('%', '')),
+                        satisfactorio: parseFloat((r[7] || '0').replace('%', '')),
+                        avanzado: parseFloat((r[8] || '0').replace('%', ''))
                     };
                 }
             }
-            return { debajo: 0, basico: 0, satisfactorio: 0, avanzado: 0 };
+            return null;
         }
 
         function aplicarFiltros() {
             const colegioSel = document.getElementById('select-colegio').value;
+            const evalSel = document.getElementById('select-evaluacion').value;
             const nivelSel = document.getElementById('select-nivel').value;
             const areaSel = document.getElementById('select-area').value;
             const anioSel = document.getElementById('select-anio').value;
 
-            document.getElementById('display-colegio').innerText = colegioSel;
+            document.getElementById('display-colegio').innerText = modoActual === 'resumen' ? colegioSel : 'Comparativa Lado a Lado';
 
-            const valsActual = obtenerValoresFiltro(colegioSel, nivelSel, areaSel, anioSel);
+            const valsActual = obtenerValoresFiltro(colegioSel, evalSel, nivelSel, areaSel, anioSel);
             
-            // Variación vs ciclo 2021
-            const vals2021 = obtenerValoresFiltro(colegioSel, nivelSel, areaSel, '2021');
-            const satAvActual = valsActual.satisfactorio + valsActual.avanzado;
-            const satAv2021 = vals2021.satisfactorio + vals2021.avanzado;
-            const diffPp = (satAvActual - satAv2021).toFixed(1);
+            if (!valsActual) {
+                document.getElementById('kpi-debajo').innerText = '--%';
+                document.getElementById('kpi-basico').innerText = '--%';
+                document.getElementById('kpi-satisfactorio').innerText = '--%';
+                document.getElementById('kpi-avanzado').innerText = '--%';
+                document.getElementById('kpi-variacion').innerText = '-- pp';
+                
+                document.getElementById('bar-debajo').style.width = '0%';
+                document.getElementById('bar-basico').style.width = '0%';
+                document.getElementById('bar-satisfactorio').style.width = '0%';
+                document.getElementById('bar-avanzado').style.width = '0%';
+
+                document.getElementById('val-debajo').innerText = '0%';
+                document.getElementById('val-basico').innerText = '0%';
+                document.getElementById('val-satisfactorio').innerText = '0%';
+                document.getElementById('val-avanzado').innerText = '0%';
+
+                renderChart(evalSel, nivelSel, areaSel, colegioSel);
+                return;
+            }
+
+            // Calcular variación respecto al ciclo anterior disponible
+            const selectAnioOpts = Array.from(document.getElementById('select-anio').options).map(o => o.value);
+            const idxAnioActual = selectAnioOpts.indexOf(anioSel);
+            let diffPp = '0.0';
+            
+            if (idxAnioActual < selectAnioOpts.length - 1) {
+                const anioAnterior = selectAnioOpts[idxAnioActual + 1];
+                const valsAnterior = obtenerValoresFiltro(colegioSel, evalSel, nivelSel, areaSel, anioAnterior);
+                if (valsAnterior) {
+                    const satAvActual = valsActual.satisfactorio + valsActual.avanzado;
+                    const satAvAnterior = valsAnterior.satisfactorio + valsAnterior.avanzado;
+                    diffPp = (satAvActual - satAvAnterior).toFixed(1);
+                }
+            }
 
             document.getElementById('kpi-debajo').innerText = `${valsActual.debajo}%`;
             document.getElementById('kpi-basico').innerText = `${valsActual.basico}%`;
@@ -406,25 +485,30 @@
             document.getElementById('val-satisfactorio').innerText = `${valsActual.satisfactorio}%`;
             document.getElementById('val-avanzado').innerText = `${valsActual.avanzado}%`;
 
-            renderChart(nivelSel, areaSel, colegioSel);
+            renderChart(evalSel, nivelSel, areaSel, colegioSel);
         }
 
-        function renderChart(nivel, area, colegio) {
+        function renderChart(evalNombre, nivel, area, colegio) {
             if (chartInstance) chartInstance.destroy();
             const ctx = document.getElementById('chartTendencia').getContext('2d');
-            const anios = ['2021', '2023'];
+            
+            // Obtener todos los ciclos ordenados para este Nivel/Evaluación
+            const selectAnioOpts = Array.from(document.getElementById('select-anio').options).map(o => o.value).reverse();
 
             if (modoActual === 'resumen') {
-                const satAvSerie = anios.map(a => {
-                    const v = obtenerValoresFiltro(colegio, nivel, area, a);
-                    return (v.satisfactorio + v.avanzado).toFixed(1);
+                const satAvSerie = selectAnioOpts.map(a => {
+                    const v = obtenerValoresFiltro(colegio, evalNombre, nivel, area, a);
+                    return v ? (v.satisfactorio + v.avanzado).toFixed(1) : 0;
                 });
-                const debajoSerie = anios.map(a => obtenerValoresFiltro(colegio, nivel, area, a).debajo.toFixed(1));
+                const debajoSerie = selectAnioOpts.map(a => {
+                    const v = obtenerValoresFiltro(colegio, evalNombre, nivel, area, a);
+                    return v ? v.debajo.toFixed(1) : 0;
+                });
 
                 chartInstance = new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: anios,
+                        labels: selectAnioOpts,
                         datasets: [
                             { label: 'Satisfactorio + Avanzado (%)', data: satAvSerie, borderColor: '#1d6a66', backgroundColor: '#1d6a66', borderWidth: 2.5, pointRadius: 5 },
                             { label: 'Por debajo del básico (%)', data: debajoSerie, borderColor: '#d96b5c', backgroundColor: '#d96b5c', borderWidth: 2.5, pointRadius: 5 }
@@ -434,19 +518,19 @@
                 });
             } else {
                 // Modo Comparativo entre escuelas
-                const albSerie = anios.map(a => {
-                    const v = obtenerValoresFiltro('Alberdi', nivel, area, a);
-                    return (v.satisfactorio + v.avanzado).toFixed(1);
+                const albSerie = selectAnioOpts.map(a => {
+                    const v = obtenerValoresFiltro('Alberdi', evalNombre, nivel, area, a);
+                    return v ? (v.satisfactorio + v.avanzado).toFixed(1) : 0;
                 });
-                const echSerie = anios.map(a => {
-                    const v = obtenerValoresFiltro('Esteban Echeverría', nivel, area, a);
-                    return (v.satisfactorio + v.avanzado).toFixed(1);
+                const echSerie = selectAnioOpts.map(a => {
+                    const v = obtenerValoresFiltro('Esteban Echeverría', evalNombre, nivel, area, a);
+                    return v ? (v.satisfactorio + v.avanzado).toFixed(1) : 0;
                 });
 
                 chartInstance = new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: anios,
+                        labels: selectAnioOpts,
                         datasets: [
                             { label: 'Alberdi (Sat + Avanzado %)', data: albSerie, borderColor: '#1d6a66', backgroundColor: '#1d6a66', borderWidth: 2.5, pointRadius: 5 },
                             { label: 'Esteban Echeverría (Sat + Avanzado %)', data: echSerie, borderColor: '#2b8a78', backgroundColor: '#2b8a78', borderWidth: 2.5, pointRadius: 5, borderDash: [5, 5] }
